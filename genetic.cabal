@@ -20,7 +20,7 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      GeneticLib
   other-modules:
       Paths_genetic
   hs-source-dirs:
