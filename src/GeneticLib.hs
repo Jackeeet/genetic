@@ -1,37 +1,50 @@
-module GeneticLib (newPopulation, nextGeneration, getFitness, select) where
+module GeneticLib (Genotype, Score, newPopulation, reproduce, getFitness, select, toPhenotype) where
 
 import           Data.Char     (digitToInt)
 import           Data.Functor  ((<&>))
 import           Data.List     (foldl')
-import           Support       (randomPairs)
+import           Support       (randomDoubles, randomList, randomPairs)
 import           System.Random
 
 type Genotype = String
-type FitFunc = (Int -> Int)
+type Phenotype = Integer
+type Score = Integer
+type Probability = Double
 
-geneLength :: Int
-geneLength = 6
+gtypeLength :: Int
+gtypeLength = 6
 
-mutProbability :: Double
-mutProbability = 0.3
+mutationP :: Probability
+mutationP = 0.3
 
-getFitness :: Int -> FitFunc -> [Genotype] -> [Int]
-getFitness offset fitFunc = map $ fitFunc . (+offset) . toInt
+getFitness :: Integer -> (Phenotype -> Score) -> [Genotype] -> [Score]
+getFitness offset fitFunc = map $ fitFunc . (+ offset) . toPhenotype
 
-newPopulation :: (Int, Int) -> Int -> IO [Genotype]
-newPopulation range size = fmap (map toGenotype) (take size . randomRs range <$> newStdGen)
+newPopulation :: (Phenotype, Phenotype) -> Int -> IO [Genotype]
+newPopulation range size = map toGenotype <$> randomList range size
 
-nextGeneration :: [Genotype] -> Int -> IO [Genotype]
-nextGeneration pop crossCount = do
+reproduce :: [Genotype] -> Int -> IO [Genotype]
+reproduce pop crossCount = do
     pairs <- randomPairs pop crossCount
     nextPop <- generateAll pairs
     let npCount = length nextPop
-    mps <- take npCount . randomRs (0.0 :: Double, 1.0 :: Double) <$> newStdGen
-    points <- take npCount . randomRs (1, geneLength) <$> newStdGen
-    return $ pop ++ [mutateCond gt point (prob <= mutProbability) | (gt, prob, point) <- zip3 nextPop mps points]
+    mps <- randomDoubles npCount
+    pts <- randomList (1, gtypeLength) npCount
+    return $ pop ++ [mutateCond gt pt (p <= mutationP) | (gt, p, pt) <- zip3 nextPop mps pts]
 
-select :: [Genotype] -> [Genotype]
-select pop = undefined
+select :: [(Genotype, Score)] -> Int -> IO [Genotype]
+select gs count = do
+    let r = roulette 0 $ getPs gs
+    picks <- randomDoubles count
+    return [ gt | (gt, lo, hi) <- r, p <- picks, p >= lo && p < hi ]
+
+roulette :: Probability -> [(Genotype, Probability)] -> [(Genotype, Probability, Probability)]
+roulette _ []         = []
+roulette acc (gp:gps) = (fst gp, acc, acc + snd gp) : roulette (acc + snd gp) gps
+
+getPs :: [(Genotype, Score)] -> [(Genotype, Probability)]
+getPs gs = [(g, fromIntegral s / total) | (g, s) <- gs]
+    where total = fromIntegral $ sum [ snd gs' | gs' <- gs ]
 
 mutateCond :: Genotype -> Int -> Bool -> Genotype
 mutateCond gt point apply = if apply then mutate gt point else gt
@@ -48,21 +61,21 @@ generateAll pairs = mapM generate pairs <&> concat
 
 generate :: (Genotype, Genotype) -> IO [Genotype]
 generate (g1, g2) = do
-    crossPoint <- randomRIO (1, geneLength)
+    crossPoint <- randomRIO (1, gtypeLength)
     return [crossover g1 g2 crossPoint, crossover g2 g1 crossPoint]
 
 crossover :: Genotype -> Genotype -> Int -> Genotype
 crossover first second point = take point first ++ drop point second
 
-toGenotype :: Int -> Genotype
+toGenotype :: Phenotype -> Genotype
 toGenotype 0 = "0"
 toGenotype n = binary n
-    where binary num = padZero geneLength $ reverse $ helper num
+    where binary num = padZero gtypeLength $ reverse $ helper num
           padZero maxLength str = replicate (maxLength - length str) '0' ++ str
           helper 0 = ""
           helper n' | n' `mod` 2 == 1 = '1' : helper m
                     | otherwise = '0' : helper m
                         where m = n' `div` 2
 
-toInt :: Genotype -> Int
-toInt = foldl' (\acc x -> acc * 2 + digitToInt x) 0
+toPhenotype :: Genotype -> Phenotype
+toPhenotype = foldl' (\acc x -> acc * 2 + (toInteger . digitToInt) x) 0

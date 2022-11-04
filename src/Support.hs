@@ -1,4 +1,4 @@
-module Support(randomPairs) where
+module Support(randomPairs, randomList, randomDoubles) where
 
 import           System.Random
 
@@ -18,3 +18,9 @@ randomPairs xs n = do
             pairs <- randomPairs xs (n - 1)
             return $ pair : pairs
     else return []
+
+randomList :: (Random a) => (a, a) -> Int -> IO [a]
+randomList range count = take count . randomRs range <$> newStdGen
+
+randomDoubles :: Int -> IO [Double]
+randomDoubles = randomList (0.0 :: Double, 1.0 :: Double)
