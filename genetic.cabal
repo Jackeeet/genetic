@@ -21,6 +21,7 @@ source-repository head
 library
   exposed-modules:
       GeneticLib
+      Support
   other-modules:
       Paths_genetic
   hs-source-dirs:
