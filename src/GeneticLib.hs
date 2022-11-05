@@ -1,8 +1,9 @@
-module GeneticLib (Genotype, Score, newPopulation, reproduce, getFitness, select, toPhenotype) where
+module GeneticLib (Genotype, Phenotype, Score, newPopulation, reproduce, getFitness, select, toPhenotype) where
 
 import           Data.Char     (digitToInt)
 import           Data.Functor  ((<&>))
-import           Data.List     (foldl')
+import           Data.List     (foldl', maximumBy)
+import           Data.Ord      (comparing)
 import           Support       (randomDoubles, randomList, randomPairs)
 import           System.Random
 
@@ -15,7 +16,7 @@ gtypeLength :: Int
 gtypeLength = 6
 
 mutationP :: Probability
-mutationP = 0.3
+mutationP = 0.45
 
 getFitness :: Integer -> (Phenotype -> Score) -> [Genotype] -> [Score]
 getFitness offset fitFunc = map $ fitFunc . (+ offset) . toPhenotype
@@ -30,13 +31,14 @@ reproduce pop crossCount = do
     let npCount = length nextPop
     mps <- randomDoubles npCount
     pts <- randomList (1, gtypeLength) npCount
-    return $ pop ++ [mutateCond gt pt (p <= mutationP) | (gt, p, pt) <- zip3 nextPop mps pts]
+    return $ pop ++ [mutateCond gt pt (mp <= mutationP) | (gt, mp, pt) <- zip3 nextPop mps pts]
 
 select :: [(Genotype, Score)] -> Int -> IO [Genotype]
 select gs count = do
+    let best = fst $ maximumBy (comparing snd) gs
     let r = roulette 0 $ getPs gs
-    picks <- randomDoubles count
-    return [ gt | (gt, lo, hi) <- r, p <- picks, p >= lo && p < hi ]
+    picks <- randomDoubles (count - 1)
+    return $ best : [ gt | (gt, lo, hi) <- r, p <- picks, p >= lo && p < hi ]
 
 roulette :: Probability -> [(Genotype, Probability)] -> [(Genotype, Probability, Probability)]
 roulette _ []         = []
@@ -68,13 +70,11 @@ crossover :: Genotype -> Genotype -> Int -> Genotype
 crossover first second point = take point first ++ drop point second
 
 toGenotype :: Phenotype -> Genotype
-toGenotype 0 = "0"
-toGenotype n = binary n
-    where binary num = padZero gtypeLength $ reverse $ helper num
-          padZero maxLength str = replicate (maxLength - length str) '0' ++ str
+toGenotype n = padZero gtypeLength $ reverse $ helper n
+    where padZero maxLength str = replicate (maxLength - length str) '0' ++ str
           helper 0 = ""
           helper n' | n' `mod` 2 == 1 = '1' : helper m
-                    | otherwise = '0' : helper m
+                    | otherwise       = '0' : helper m
                         where m = n' `div` 2
 
 toPhenotype :: Genotype -> Phenotype
