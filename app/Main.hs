@@ -5,6 +5,7 @@ import           Data.Foldable (maximumBy, minimumBy)
 import           Data.Ord      (comparing)
 import           GeneticLib
 import           System.IO
+import           System.IO.CodePage
 
 f :: Integer -> Integer -> Integer -> Integer -> Integer -> Integer
 f a b c d x = a + b * x + c * (x ^ 2) + d * (x ^ 3)
@@ -15,8 +16,12 @@ rangeFrom = -10
 rangeTo :: Integer
 rangeTo = 53
 
-main :: IO ()
+main :: IO Char
 main = do
+    withCP65001 run
+
+run :: IO Char 
+run = do
     putStrLn "Генетический алгоритм поиска значений функции a + bx + cx^2 + dx^3"
     fn <- readFunc
     let offset = if rangeFrom < 0 then (-1) * rangeFrom else 0 :: Integer
@@ -34,6 +39,9 @@ main = do
     printGen offset initial values best 0
     putStrLn "-----------"
     runGenerations runParams initial maxIters maxIters
+    putStrLn "Введите любой символ, чтобы завершить работу:"
+    getChar
+
 
 type RunParams = (Integer, Bool, Integer -> Integer, Int)
 
